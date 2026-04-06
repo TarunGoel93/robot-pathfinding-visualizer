@@ -2149,3 +2149,4 @@ function StatBadge({ label, value, color }) {
     </div>
   );
 }
+

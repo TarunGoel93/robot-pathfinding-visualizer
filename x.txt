@@ -1,100 +1,12 @@
 // ===================== MAIN COMPONENT =====================
 import { useState, useRef, useCallback } from "react";
 
-import { ALGOS, CELL_EMPTY, CELL_WALL }       from "./constants.js";
+import { ALGOS, CELL_EMPTY, CELL_WALL }      from "./constants.js";
 import { createGrid, generateRecursiveMaze, findFirstEmptyCell } from "./gridUtils.js";
-import { runAlgo, benchmarkAll }              from "./algorithms.js";
-import Sidebar                                from "./components/Sidebar.jsx";
-import { StatBadge }                          from "./components/UIComponents.jsx";
+import { runAlgo, benchmarkAll }             from "./algorithms.js";
+import Sidebar                               from "./components/Sidebar.jsx";
+import { StatBadge }                         from "./components/UIComponents.jsx";
 import { RunAllResultsPanel, BenchmarkPanel } from "./components/ResultPanels.jsx";
-
-// ╔══════════════════════════════════════════════════════════════════╗
-// ║              AI API CONFIGURATION — EDIT THIS SECTION           ║
-// ║                                                                  ║
-// ║  STEP 1 — Choose your provider:                                  ║
-// ║    "anthropic"  →  Claude models  (api.anthropic.com)           ║
-// ║    "openai"     →  GPT models     (api.openai.com)              ║
-// ║    "gemini"     →  Gemini models  (generativelanguage.google)   ║
-// ║    "none"       →  skip AI, use local math (no key needed)      ║
-// ║                                                                  ║
-// ║  STEP 2 — Paste your API key on the AI_API_KEY line             ║
-// ║                                                                  ║
-// ║  STEP 3 — Optionally change the model name                      ║
-// ╚══════════════════════════════════════════════════════════════════╝
-
-const AI_PROVIDER = "anthropic";          // "anthropic" | "openai" | "gemini" | "none"
-const AI_API_KEY  = "YOUR_API_KEY_HERE";  // ← paste your key here
-
-const AI_MODEL = {
-  anthropic : "claude-opus-4-5",           // or "claude-sonnet-4-5", "claude-haiku-4-5-20251001"
-  openai    : "gpt-4o",                    // or "gpt-4o-mini", "gpt-3.5-turbo"
-  gemini    : "gemini-2.0-flash",          // or "gemini-1.5-pro"
-  none      : "",
-}[AI_PROVIDER];
-
-// ── internal: send one prompt to whichever provider is active ──────
-async function callAI(userPrompt) {
-  // If no provider or key is set, return null → caller uses local math
-  if (AI_PROVIDER === "none" || !AI_API_KEY || AI_API_KEY === "YOUR_API_KEY_HERE") {
-    return null;
-  }
-
-  // ── Anthropic / Claude ──────────────────────────────────────────
-  if (AI_PROVIDER === "anthropic") {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method : "POST",
-      headers: {
-        "Content-Type"      : "application/json",
-        "x-api-key"         : AI_API_KEY,
-        "anthropic-version" : "2023-06-01",
-      },
-      body: JSON.stringify({
-        model      : AI_MODEL,
-        max_tokens : 1024,
-        messages   : [{ role: "user", content: userPrompt }],
-      }),
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    return data.content.map(b => b.text || "").join("").trim();
-  }
-
-  // ── OpenAI / GPT ────────────────────────────────────────────────
-  if (AI_PROVIDER === "openai") {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method : "POST",
-      headers: {
-        "Content-Type" : "application/json",
-        "Authorization": `Bearer ${AI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model    : AI_MODEL,
-        messages : [{ role: "user", content: userPrompt }],
-      }),
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    return data.choices[0].message.content.trim();
-  }
-
-  // ── Google Gemini ───────────────────────────────────────────────
-  if (AI_PROVIDER === "gemini") {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${AI_MODEL}:generateContent?key=${AI_API_KEY}`;
-    const res = await fetch(url, {
-      method : "POST",
-      headers: { "Content-Type": "application/json" },
-      body   : JSON.stringify({
-        contents: [{ parts: [{ text: userPrompt }] }],
-      }),
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    return data.candidates[0].content.parts[0].text.trim();
-  }
-
-  throw new Error(`Unknown AI_PROVIDER: "${AI_PROVIDER}"`);
-}
-// ════════════════════════════════════════════════════════════════════
 
 export default function PathfindingVisualizer() {
   const [ROWS, setROWS] = useState(55);
@@ -111,33 +23,19 @@ export default function PathfindingVisualizer() {
   const [frontierCells, setFrontierCells] = useState(new Set());
   const [pathCells,     setPathCells]     = useState(new Set());
 
-  const [stats,          setStats]          = useState(null);
-  const [benchmarks,     setBenchmarks]     = useState(null);
-  const [showBenchPanel, setShowBenchPanel] = useState(false);
-  const [isDrawing,      setIsDrawing]      = useState(false);
-  const [isBenchmarking, setIsBenchmarking] = useState(false);
-  const [threshold,      setThreshold]      = useState(118);
+  const [stats,         setStats]         = useState(null);
+  const [benchmarks,    setBenchmarks]    = useState(null);
+  const [showBenchPanel,setShowBenchPanel]= useState(false);
+  const [isDrawing,     setIsDrawing]     = useState(false);
+  const [isBenchmarking,setIsBenchmarking]= useState(false);
+  const [threshold,     setThreshold]     = useState(118);
 
   const [autoRunningAlgo, setAutoRunningAlgo] = useState(null);
   const [bestAlgo,        setBestAlgo]        = useState(null);
   const [allAlgoResults,  setAllAlgoResults]  = useState(null);
 
-  // ── Car command state ──
-  const [pathArray,       setPathArray]       = useState([]);
-  const [carCommands,     setCarCommands]     = useState("");
-  const [carCommandsJSON, setCarCommandsJSON] = useState("");
-  const [showCarPanel,    setShowCarPanel]    = useState(false);
-  const [isGenerating,    setIsGenerating]    = useState(false);
-  const [aiError,         setAiError]         = useState("");
-
-  // ── Bluetooth state ──
-  const [btDevice, setBtDevice] = useState(null);
-  const [btStatus, setBtStatus] = useState("disconnected");
-  const [btLog,    setBtLog]    = useState("");
-
-  const animRef      = useRef(null);
+  const animRef    = useRef(null);
   const fileInputRef = useRef(null);
-  const btCharRef    = useRef(null); // mutable ref so async BT callbacks see latest char
 
   // ---- derived ----
   const currentAlgo  = ALGOS.find(a => a.id === algo);
@@ -171,11 +69,6 @@ export default function PathfindingVisualizer() {
     setAutoRunningAlgo(null);
     setBestAlgo(null);
     setAllAlgoResults(null);
-    setPathArray([]);
-    setCarCommands("");
-    setCarCommandsJSON("");
-    setShowCarPanel(false);
-    setAiError("");
   }
 
   function clearAll() {
@@ -208,8 +101,8 @@ export default function PathfindingVisualizer() {
     clearVisualization();
     setIsRunning(true);
 
-    const t0       = performance.now();
-    const steps    = runAlgo(algo, grid, startNode, endNode, ROWS, COLS);
+    const t0 = performance.now();
+    const steps = runAlgo(algo, grid, startNode, endNode, ROWS, COLS);
     const algoTime = performance.now() - t0;
 
     if (!steps.length) {
@@ -226,7 +119,6 @@ export default function PathfindingVisualizer() {
       setVisitedCells(new Set(last.visited.map(([r,c]) => `${r},${c}`)));
       setFrontierCells(new Set());
       setPathCells(new Set((last.path || []).map(([r,c]) => `${r},${c}`)));
-      if (found) setPathArray(last.path);
       setIsRunning(false);
       setStats({ visited: last.visited.length, pathLen: found ? last.path.length - 1 : 0, time: algoTime.toFixed(3), found });
       return;
@@ -238,7 +130,6 @@ export default function PathfindingVisualizer() {
         setVisitedCells(new Set(last.visited.map(([r,c]) => `${r},${c}`)));
         setFrontierCells(new Set());
         setPathCells(new Set((last.path || []).map(([r,c]) => `${r},${c}`)));
-        if (found) setPathArray(last.path);
         setIsRunning(false);
         setStats({ visited: last.visited.length, pathLen: found ? last.path.length - 1 : 0, time: algoTime.toFixed(3), found });
         return;
@@ -263,9 +154,9 @@ export default function PathfindingVisualizer() {
     const delay = getDelay(speed);
 
     const allSteps = ALGOS.map(a => {
-      const t0    = performance.now();
+      const t0 = performance.now();
       const steps = runAlgo(a.id, currentGrid, currentStart, currentEnd, ROWS, COLS);
-      const time  = (performance.now() - t0).toFixed(3);
+      const time = (performance.now() - t0).toFixed(3);
       const last  = steps.length ? steps[steps.length - 1] : null;
       const found = !!(last && last.path && last.path.length > 0);
       return { ...a, steps, time, last, found, pathLen: found ? last.path.length - 1 : 0, visited: last ? last.visited.length : 0 };
@@ -286,7 +177,6 @@ export default function PathfindingVisualizer() {
           setVisitedCells(new Set(bl.visited.map(([r,c]) => `${r},${c}`)));
           setFrontierCells(new Set());
           setPathCells(new Set((bl.path || []).map(([r,c]) => `${r},${c}`)));
-          if (bl.path) setPathArray(bl.path);
           setAlgo(best.id);
           setBestAlgo({ label: best.label, color: best.color, icon: best.icon, pathLen: best.pathLen, visited: best.visited, time: best.time });
           setStats({ visited: best.visited, pathLen: best.pathLen, time: best.time, found: true });
@@ -386,7 +276,7 @@ export default function PathfindingVisualizer() {
         const newGrid = createGrid(newRows, newCols);
         for (let r = 0; r < newRows; r++)
           for (let c = 0; c < newCols; c++) {
-            const idx        = (r * newCols + c) * 4;
+            const idx = (r * newCols + c) * 4;
             const brightness = data[idx]*0.299 + data[idx+1]*0.587 + data[idx+2]*0.114;
             newGrid[r][c].type = brightness < threshold ? CELL_WALL : CELL_EMPTY;
           }
@@ -399,145 +289,6 @@ export default function PathfindingVisualizer() {
     };
     img.src = url;
   };
-
-  // ===================== CAR COMMAND HELPERS =====================
-
-  // Converts [[row,col],...] → run-length encoded direction steps
-  function pathToDirections(path) {
-    if (path.length < 2) return [];
-    const DIRS = { "-1,0":"UP", "1,0":"DOWN", "0,-1":"LEFT", "0,1":"RIGHT" };
-    const steps = [];
-    for (let i = 1; i < path.length; i++) {
-      const dr  = path[i][0] - path[i-1][0];
-      const dc  = path[i][1] - path[i-1][1];
-      const dir = DIRS[`${dr},${dc}`] || "?";
-      if (steps.length && steps[steps.length - 1].dir === dir) {
-        steps[steps.length - 1].count++;
-      } else {
-        steps.push({ dir, count: 1 });
-      }
-    }
-    return steps;
-  }
-
-  // Pure-JS fallback — always works, no API needed
-  function buildCommandsLocally(steps) {
-    const DIR_MAP   = { UP:"FORWARD", DOWN:"BACKWARD", LEFT:"LEFT", RIGHT:"RIGHT" };
-    const cmdString = steps.map(s => `${DIR_MAP[s.dir] ?? s.dir} ${s.count};`).join(" ");
-    const cmdJSON   = JSON.stringify(steps.map(s => ({ cmd: DIR_MAP[s.dir] ?? s.dir, steps: s.count })));
-    return { cmdString, cmdJSON };
-  }
-
-  // Main entry point — tries AI, gracefully falls back to local math on any error
-  async function generateCarCommands() {
-    if (!pathArray.length) return;
-    setShowCarPanel(true);
-    setIsGenerating(true);
-    setCarCommands("Generating…");
-    setCarCommandsJSON("");
-    setAiError("");
-
-    const steps   = pathToDirections(pathArray);
-    const stepStr = steps.map(s => `${s.dir} ${s.count}`).join(", ");
-
-    const prompt = `You are a robot car command formatter. Convert these directional steps into commands for a physical car.
-
-Directional steps (direction + grid cell count): ${stepStr}
-Full path coordinates [row, col]: ${JSON.stringify(pathArray)}
-
-Rules:
-- The car starts facing UP (north). Mapping: UP→FORWARD, DOWN→BACKWARD, RIGHT→RIGHT, LEFT→LEFT
-- Output exactly TWO lines, nothing else:
-  Line 1: semicolon-separated command string  e.g.  FORWARD 3; RIGHT 2; FORWARD 5;
-  Line 2: JSON array  e.g.  [{"cmd":"FORWARD","steps":3},{"cmd":"RIGHT","steps":2}]
-- No extra text, no markdown, no explanations.`;
-
-    try {
-      const aiText = await callAI(prompt);
-
-      if (aiText === null) {
-        // Provider is "none" or key not filled in
-        const { cmdString, cmdJSON } = buildCommandsLocally(steps);
-        setCarCommands(cmdString);
-        setCarCommandsJSON(cmdJSON);
-        setAiError("ℹ️ No API key set — using local calculation instead.");
-      } else {
-        const lines = aiText.split("\n").map(l => l.trim()).filter(Boolean);
-        setCarCommands(lines[0] || aiText);
-        setCarCommandsJSON(lines[1] || "");
-      }
-    } catch (err) {
-      // API failed (CORS if called without a proxy, bad key, network issue, etc.)
-      const { cmdString, cmdJSON } = buildCommandsLocally(steps);
-      setCarCommands(cmdString);
-      setCarCommandsJSON(cmdJSON);
-      setAiError(`⚠️ AI error: ${err.message} — showing local calculation instead.`);
-    }
-
-    setIsGenerating(false);
-  }
-
-  // ---- Bluetooth helpers ----
-  async function connectBluetooth() {
-    if (!navigator.bluetooth) {
-      setBtLog("Web Bluetooth not supported. Use Chrome on desktop or Android.");
-      setBtStatus("error");
-      return;
-    }
-    try {
-      setBtLog("Scanning for Bluetooth devices…");
-      const device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices : true,
-        optionalServices : ["0000ffe0-0000-1000-8000-00805f9b34fb"], // HC-05/HC-06 serial
-      });
-      setBtLog(`Connecting to "${device.name}"…`);
-      const server  = await device.gatt.connect();
-      const service = await server.getPrimaryService("0000ffe0-0000-1000-8000-00805f9b34fb");
-      const char    = await service.getCharacteristic("0000ffe1-0000-1000-8000-00805f9b34fb");
-      btCharRef.current = char;
-      setBtDevice(device);
-      setBtStatus("connected");
-      setBtLog(`✓ Connected to "${device.name}". Ready to send commands.`);
-      device.addEventListener("gattserverdisconnected", () => {
-        btCharRef.current = null;
-        setBtDevice(null);
-        setBtStatus("disconnected");
-        setBtLog("Device disconnected.");
-      });
-    } catch (err) {
-      setBtLog("Bluetooth error: " + err.message);
-      setBtStatus("error");
-    }
-  }
-
-  async function sendBluetoothCommands() {
-    const char = btCharRef.current;
-    if (!char || !carCommands) { setBtLog("No device or no commands."); return; }
-    try {
-      await char.writeValue(new TextEncoder().encode(carCommands + "\n"));
-      setBtLog("✓ Sent: " + carCommands);
-    } catch (err) {
-      setBtLog("Send failed: " + err.message);
-    }
-  }
-
-  function disconnectBluetooth() {
-    if (btDevice && btDevice.gatt.connected) btDevice.gatt.disconnect();
-    btCharRef.current = null;
-    setBtDevice(null);
-    setBtStatus("disconnected");
-    setBtLog("Disconnected.");
-  }
-
-  // Labels shown in the UI
-  const providerLabel = {
-    anthropic : `Claude (${AI_MODEL})`,
-    openai    : `OpenAI (${AI_MODEL})`,
-    gemini    : `Gemini (${AI_MODEL})`,
-    none      : "Local math (no AI)",
-  }[AI_PROVIDER] ?? AI_PROVIDER;
-
-  const apiKeySet = AI_PROVIDER !== "none" && AI_API_KEY && AI_API_KEY !== "YOUR_API_KEY_HERE";
 
   // ===================== RENDER =====================
   return (
@@ -569,6 +320,7 @@ Rules:
         </div>
 
         <div style={{ display:"flex", alignItems:"center", gap:"12px", flexWrap:"wrap" }}>
+          {/* Running indicator */}
           {autoRunningAlgo && (
             <div className="fade-up" style={{ display:"flex", alignItems:"center", gap:"10px", padding:"6px 14px", background:"#eff6ff", border:"1.5px solid #bfdbfe", borderRadius:"8px" }}>
               {ALGOS.map((a, i) => (
@@ -583,6 +335,7 @@ Rules:
             </div>
           )}
 
+          {/* Best algo winner badge */}
           {bestAlgo && !autoRunningAlgo && (
             <div className="best-pop" style={{ display:"flex", alignItems:"center", gap:"10px", padding:"7px 16px", background:`${bestAlgo.color}0e`, border:`1.5px solid ${bestAlgo.color}44`, borderRadius:"8px" }}>
               <span style={{fontSize:"18px"}}>🏆</span>
@@ -598,6 +351,7 @@ Rules:
             </div>
           )}
 
+          {/* Single-algo stats */}
           {stats && !bestAlgo && (
             <div className="fade-up" style={{ display:"flex", gap:"12px", flexWrap:"wrap" }}>
               <StatBadge label="Status"   value={stats.found ? "✓ Found" : "✗ No Path"} color={stats.found ? "#059669" : "#dc2626"} />
@@ -626,7 +380,6 @@ Rules:
 
           {/* Toolbar */}
           <div style={{ background:"#fff", borderBottom:"1px solid #e8ecf5", padding:"12px 20px", display:"flex", gap:"8px", flexWrap:"wrap", alignItems:"center" }}>
-
             <button className="btn-act" onClick={visualize} disabled={isRunning}
               style={{ padding:"10px 22px", background:isRunning?"#e2e8f0":"linear-gradient(135deg,#2563eb,#3b82f6)", color:isRunning?"#94a3b8":"#fff", border:"none", borderRadius:"8px", cursor:isRunning?"not-allowed":"pointer", fontFamily:"inherit", fontSize:"13px", fontWeight:"600" }}>
               {isRunning && !autoRunningAlgo ? <span className="pulsing">Running…</span> : "▶ Visualize"}
@@ -662,25 +415,6 @@ Rules:
               📤 Upload Floor Plan
             </button>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{display:"none"}} />
-
-            {/* 🚗 Generate Car Commands */}
-            <button
-              className="btn-act"
-              onClick={generateCarCommands}
-              disabled={isRunning || isGenerating || pathArray.length === 0}
-              style={{
-                padding     : "10px 16px",
-                background  : (isRunning || isGenerating || pathArray.length === 0) ? "#e2e8f0" : "linear-gradient(135deg,#15803d,#16a34a)",
-                color       : (isRunning || isGenerating || pathArray.length === 0) ? "#94a3b8" : "#fff",
-                border      : "none",
-                borderRadius: "8px",
-                cursor      : (isRunning || isGenerating || pathArray.length === 0) ? "not-allowed" : "pointer",
-                fontFamily  : "inherit",
-                fontSize    : "13px",
-                fontWeight  : "600",
-              }}>
-              {isGenerating ? <span className="pulsing">Generating…</span> : "🚗 Generate Car Commands"}
-            </button>
           </div>
 
           {/* Run All results panel */}
@@ -699,147 +433,6 @@ Rules:
               maxBenchTime={maxBenchTime}
               onClose={() => setShowBenchPanel(false)}
             />
-          )}
-
-          {/* ── Car Commands Panel ── */}
-          {showCarPanel && (
-            <div style={{ background:"#f0fdf4", borderBottom:"1px solid #bbf7d0", padding:"14px 20px", fontFamily:"'DM Mono',monospace", fontSize:"13px" }}>
-
-              {/* Header */}
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-                  <span style={{ fontWeight:"600", color:"#15803d", fontSize:"14px" }}>🚗 Car Commands</span>
-                  <span style={{
-                    fontSize:"10px", padding:"2px 8px", borderRadius:"4px",
-                    background: apiKeySet ? "#dbeafe" : "#fef3c7",
-                    color     : apiKeySet ? "#1e40af" : "#92400e",
-                    border    : `1px solid ${apiKeySet ? "#bfdbfe" : "#fde68a"}`,
-                  }}>
-                    {apiKeySet ? `🤖 ${providerLabel}` : "🔢 Local math (no API key)"}
-                  </span>
-                </div>
-                <button onClick={() => setShowCarPanel(false)}
-                  style={{ background:"none", border:"none", cursor:"pointer", color:"#94a3b8", fontSize:"18px", lineHeight:1 }}>
-                  ✕
-                </button>
-              </div>
-
-              {/* Error / info notice */}
-              {aiError && (
-                <div style={{ marginBottom:"8px", padding:"6px 10px", background:"#fef9c3", border:"1px solid #fde047", borderRadius:"6px", fontSize:"11px", color:"#713f12" }}>
-                  {aiError}
-                </div>
-              )}
-
-              {/* Raw path array */}
-              <div style={{ marginBottom:"8px" }}>
-                <div style={{ fontSize:"10px", letterSpacing:"2px", color:"#6b7280", textTransform:"uppercase", marginBottom:"3px" }}>
-                  Raw path array — {pathArray.length} coordinates
-                </div>
-                <div style={{ background:"#dcfce7", border:"1px solid #86efac", borderRadius:"6px", padding:"6px 10px", color:"#166534", fontSize:"11px", wordBreak:"break-all", maxHeight:"48px", overflowY:"auto" }}>
-                  {JSON.stringify(pathArray)}
-                </div>
-              </div>
-
-              {/* Compressed directional steps */}
-              <div style={{ marginBottom:"8px" }}>
-                <div style={{ fontSize:"10px", letterSpacing:"2px", color:"#6b7280", textTransform:"uppercase", marginBottom:"3px" }}>
-                  Compressed directional steps
-                </div>
-                <div style={{ display:"flex", flexWrap:"wrap", gap:"5px" }}>
-                  {pathToDirections(pathArray).map((s, i) => {
-                    const ARROW = { UP:"↑", DOWN:"↓", LEFT:"←", RIGHT:"→" };
-                    const COLOR = { UP:"#185FA5", DOWN:"#3B6D11", LEFT:"#854F0B", RIGHT:"#993C1D" };
-                    return (
-                      <span key={i} style={{
-                        display:"inline-flex", alignItems:"center", gap:"3px",
-                        padding:"2px 8px", borderRadius:"5px",
-                        background:`${COLOR[s.dir]}18`, color:COLOR[s.dir],
-                        border:`0.5px solid ${COLOR[s.dir]}55`, fontSize:"12px",
-                      }}>
-                        {ARROW[s.dir]} {s.dir} ×{s.count}
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Command string */}
-              <div style={{ marginBottom:"8px" }}>
-                <div style={{ fontSize:"10px", letterSpacing:"2px", color:"#6b7280", textTransform:"uppercase", marginBottom:"3px" }}>
-                  Command string (car-ready)
-                </div>
-                <div style={{ background:"#dcfce7", border:"1px solid #86efac", borderRadius:"6px", padding:"8px 10px", color:"#166534", wordBreak:"break-all", minHeight:"32px" }}>
-                  {carCommands || "—"}
-                </div>
-              </div>
-
-              {/* JSON array */}
-              {carCommandsJSON && (
-                <div style={{ marginBottom:"8px" }}>
-                  <div style={{ fontSize:"10px", letterSpacing:"2px", color:"#6b7280", textTransform:"uppercase", marginBottom:"3px" }}>
-                    JSON array (for programmatic use)
-                  </div>
-                  <div style={{ background:"#dcfce7", border:"1px solid #86efac", borderRadius:"6px", padding:"8px 10px", color:"#166534", wordBreak:"break-all", maxHeight:"56px", overflowY:"auto", fontSize:"11px" }}>
-                    {carCommandsJSON}
-                  </div>
-                </div>
-              )}
-
-              {/* Copy buttons */}
-              <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", marginBottom:"12px" }}>
-                {[
-                  { label:"Copy command string", text: carCommands,               disabled: !carCommands },
-                  { label:"Copy JSON array",      text: carCommandsJSON,           disabled: !carCommandsJSON },
-                  { label:"Copy raw path",        text: JSON.stringify(pathArray), disabled: !pathArray.length },
-                ].map(btn => (
-                  <button key={btn.label} className="btn-act"
-                    onClick={() => navigator.clipboard.writeText(btn.text)}
-                    disabled={btn.disabled}
-                    style={{ fontSize:"12px", padding:"5px 12px", border:"1px solid #86efac", borderRadius:"6px", cursor: btn.disabled ? "not-allowed" : "pointer", background:"#fff", color:"#166534", opacity: btn.disabled ? 0.5 : 1 }}>
-                    {btn.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Bluetooth section */}
-              <div style={{ borderTop:"1px solid #bbf7d0", paddingTop:"10px" }}>
-                <div style={{ fontSize:"10px", letterSpacing:"2px", color:"#6b7280", textTransform:"uppercase", marginBottom:"6px" }}>
-                  Bluetooth — send to car · Chrome desktop / Android only
-                </div>
-                <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px" }}>
-                  <div style={{
-                    width:"9px", height:"9px", borderRadius:"50%", flexShrink:0,
-                    background: btStatus === "connected" ? "#16a34a" : btStatus === "error" ? "#dc2626" : "#9ca3af",
-                  }} />
-                  <span style={{ fontSize:"12px", color:"#374151" }}>
-                    {btStatus === "connected" ? `Connected: ${btDevice?.name || "device"}` : btStatus === "error" ? "Connection error" : "Not connected"}
-                  </span>
-                </div>
-                <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", marginBottom:"6px" }}>
-                  <button className="btn-act" onClick={connectBluetooth}
-                    disabled={btStatus === "connected"}
-                    style={{ fontSize:"12px", padding:"5px 12px", border:"1px solid #86efac", borderRadius:"6px", cursor: btStatus === "connected" ? "not-allowed" : "pointer", background:"#fff", color:"#166534", opacity: btStatus === "connected" ? 0.5 : 1 }}>
-                    📡 Connect BT device
-                  </button>
-                  <button className="btn-act" onClick={sendBluetoothCommands}
-                    disabled={btStatus !== "connected" || !carCommands}
-                    style={{ fontSize:"12px", padding:"5px 12px", border:"1px solid #86efac", borderRadius:"6px", cursor:(btStatus !== "connected" || !carCommands) ? "not-allowed" : "pointer", background:(btStatus === "connected" && carCommands) ? "#15803d" : "#e2e8f0", color:(btStatus === "connected" && carCommands) ? "#fff" : "#94a3b8" }}>
-                    ▶ Send to car
-                  </button>
-                  <button className="btn-act" onClick={disconnectBluetooth}
-                    disabled={btStatus !== "connected"}
-                    style={{ fontSize:"12px", padding:"5px 12px", border:"1px solid #fca5a5", borderRadius:"6px", cursor: btStatus !== "connected" ? "not-allowed" : "pointer", background:"#fff", color:"#dc2626", opacity: btStatus !== "connected" ? 0.5 : 1 }}>
-                    Disconnect
-                  </button>
-                </div>
-                {btLog && (
-                  <div style={{ fontSize:"11px", color: btLog.startsWith("✓") ? "#15803d" : "#6b7280" }}>
-                    {btLog}
-                  </div>
-                )}
-              </div>
-            </div>
           )}
 
           {/* Grid */}
@@ -876,7 +469,7 @@ Rules:
 
           <div style={{ padding:"8px 20px", background:"#fff", borderTop:"1px solid #e8ecf5", fontSize:"11px", color:"#94a3b8", display:"flex", gap:"16px", flexWrap:"wrap" }}>
             <span>Draw walls by clicking/dragging · Place source/target via Draw Mode · Click ⚡ Run All & Compare to find the best path</span>
-            <span>After visualizing, click 🚗 Generate Car Commands · AI: <strong>{providerLabel}</strong></span>
+            <span>Upload image → adjust threshold → run</span>
           </div>
         </div>
       </div>
