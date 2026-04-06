@@ -540,6 +540,8 @@ Rules:
   const apiKeySet = AI_PROVIDER !== "none" && AI_API_KEY && AI_API_KEY !== "YOUR_API_KEY_HERE";
 
   // ===================== RENDER =====================
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
     <div style={{ minHeight:"100vh", background:"#f8f9fc", fontFamily:"'Georgia',serif", color:"#1a1a2e", display:"flex", flexDirection:"column" }}>
       <style>{`
@@ -556,41 +558,84 @@ Rules:
         .fade-up { animation: fadeUp 0.35s ease forwards; }
         @keyframes bestPop { 0%{transform:scale(0.92);opacity:0} 60%{transform:scale(1.04)} 100%{transform:scale(1);opacity:1} }
         .best-pop { animation: bestPop 0.4s ease forwards; }
+        @keyframes slideInLeft { from{opacity:0;transform:translateX(-100%)} to{opacity:1;transform:translateX(0)} }
+        .sidebar-mobile { animation: slideInLeft 0.25s ease forwards; }
+
+        /* Responsive toolbar: wrap and shrink buttons on small screens */
+        .toolbar-btn { white-space: nowrap; }
+        @media (max-width: 640px) {
+          .toolbar-btn { padding: 7px 10px !important; font-size: 11px !important; }
+          .header-subtitle { display: none; }
+          .stat-badges { gap: 6px !important; }
+          .best-pop-stats { display: none !important; }
+          .footer-hint { display: none; }
+        }
+        @media (max-width: 900px) {
+          .best-pop-stats { display: none !important; }
+        }
+        /* Touch-friendly grid cells on mobile */
+        @media (pointer: coarse) {
+          .cell { min-width: 6px !important; min-height: 6px !important; }
+        }
+        /* Sidebar overlay backdrop */
+        .sidebar-backdrop {
+          display: none;
+          position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 99;
+        }
+        @media (max-width: 768px) {
+          .sidebar-desktop { display: none !important; }
+          .sidebar-backdrop.open { display: block; }
+          .sidebar-drawer {
+            position: fixed; left: 0; top: 0; bottom: 0; z-index: 100;
+            width: 260px; overflow-y: auto;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+          }
+        }
+        @media (min-width: 769px) {
+          .sidebar-drawer { position: static !important; box-shadow: none !important; }
+          .sidebar-toggle { display: none !important; }
+        }
       `}</style>
 
       {/* ── Header ── */}
-      <div style={{ background:"#fff", borderBottom:"2px solid #e8ecf5", padding:"14px 28px", display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"12px", boxShadow:"0 2px 8px rgba(0,0,0,0.04)" }}>
-        <div style={{ display:"flex", alignItems:"center", gap:"14px" }}>
-          <div style={{ width:"40px", height:"40px", background:"linear-gradient(135deg,#2563eb,#7c3aed)", borderRadius:"10px", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:"20px" }}>◈</div>
+      <div style={{ background:"#fff", borderBottom:"2px solid #e8ecf5", padding:"10px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:"8px", boxShadow:"0 2px 8px rgba(0,0,0,0.04)" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+          {/* Mobile sidebar toggle */}
+          <button className="btn-act sidebar-toggle"
+            onClick={() => setSidebarOpen(o => !o)}
+            style={{ width:"36px", height:"36px", border:"1.5px solid #e2e8f0", borderRadius:"8px", background:"#fff", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"18px", cursor:"pointer", flexShrink:0 }}>
+            ☰
+          </button>
+          <div style={{ width:"36px", height:"36px", background:"linear-gradient(135deg,#2563eb,#7c3aed)", borderRadius:"10px", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:"18px", flexShrink:0 }}>◈</div>
           <div>
-            <div style={{ fontSize:"9px", letterSpacing:"3px", color:"#94a3b8", fontFamily:"'DM Mono',monospace", textTransform:"uppercase" }}>UNIVERSITY PROJECT · ROBOTICS</div>
-            <div style={{ fontSize:"20px", fontWeight:"700", fontFamily:"'Playfair Display',serif", color:"#1e3a8a" }}>Pathfinding Visualizer</div>
+            <div className="header-subtitle" style={{ fontSize:"9px", letterSpacing:"3px", color:"#94a3b8", fontFamily:"'DM Mono',monospace", textTransform:"uppercase" }}>UNIVERSITY PROJECT · ROBOTICS</div>
+            <div style={{ fontSize:"17px", fontWeight:"700", fontFamily:"'Playfair Display',serif", color:"#1e3a8a", lineHeight:1.2 }}>Pathfinding Visualizer</div>
           </div>
         </div>
 
-        <div style={{ display:"flex", alignItems:"center", gap:"12px", flexWrap:"wrap" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"8px", flexWrap:"wrap", flex:"1", justifyContent:"flex-end" }}>
           {autoRunningAlgo && (
-            <div className="fade-up" style={{ display:"flex", alignItems:"center", gap:"10px", padding:"6px 14px", background:"#eff6ff", border:"1.5px solid #bfdbfe", borderRadius:"8px" }}>
+            <div className="fade-up" style={{ display:"flex", alignItems:"center", gap:"6px", padding:"5px 10px", background:"#eff6ff", border:"1.5px solid #bfdbfe", borderRadius:"8px" }}>
               {ALGOS.map((a, i) => (
                 <span key={a.id} style={{ display:"flex", alignItems:"center", gap:"4px" }}>
-                  <span style={{ fontSize:"12px", fontFamily:"'DM Mono',monospace", fontWeight:"600", color: a.label === autoRunningAlgo ? a.color : "#cbd5e1", transition:"color 0.2s" }}>
+                  <span style={{ fontSize:"11px", fontFamily:"'DM Mono',monospace", fontWeight:"600", color: a.label === autoRunningAlgo ? a.color : "#cbd5e1", transition:"color 0.2s" }}>
                     <span className={a.label === autoRunningAlgo ? "pulsing" : ""}>{a.icon}</span> {a.short}
                   </span>
-                  {i < ALGOS.length - 1 && <span style={{color:"#e2e8f0",fontSize:"11px"}}> · </span>}
+                  {i < ALGOS.length - 1 && <span style={{color:"#e2e8f0",fontSize:"10px"}}> · </span>}
                 </span>
               ))}
-              <span className="pulsing" style={{fontSize:"11px",color:"#94a3b8",fontFamily:"'DM Mono',monospace",marginLeft:"4px"}}>running…</span>
+              <span className="pulsing" style={{fontSize:"10px",color:"#94a3b8",fontFamily:"'DM Mono',monospace",marginLeft:"2px"}}>running…</span>
             </div>
           )}
 
           {bestAlgo && !autoRunningAlgo && (
-            <div className="best-pop" style={{ display:"flex", alignItems:"center", gap:"10px", padding:"7px 16px", background:`${bestAlgo.color}0e`, border:`1.5px solid ${bestAlgo.color}44`, borderRadius:"8px" }}>
-              <span style={{fontSize:"18px"}}>🏆</span>
+            <div className="best-pop" style={{ display:"flex", alignItems:"center", gap:"8px", padding:"6px 12px", background:`${bestAlgo.color}0e`, border:`1.5px solid ${bestAlgo.color}44`, borderRadius:"8px" }}>
+              <span style={{fontSize:"16px"}}>🏆</span>
               <div>
-                <div style={{fontSize:"9px",letterSpacing:"2px",color:"#94a3b8",fontFamily:"'DM Mono',monospace",textTransform:"uppercase"}}>Best Path Found By</div>
-                <div style={{fontSize:"14px",fontWeight:"700",color:bestAlgo.color,fontFamily:"'DM Mono',monospace"}}>{bestAlgo.icon} {bestAlgo.label}</div>
+                <div style={{fontSize:"8px",letterSpacing:"2px",color:"#94a3b8",fontFamily:"'DM Mono',monospace",textTransform:"uppercase"}}>Best Path Found By</div>
+                <div style={{fontSize:"13px",fontWeight:"700",color:bestAlgo.color,fontFamily:"'DM Mono',monospace"}}>{bestAlgo.icon} {bestAlgo.label}</div>
               </div>
-              <div style={{borderLeft:`1px solid ${bestAlgo.color}33`,paddingLeft:"12px",display:"flex",gap:"12px"}}>
+              <div className="best-pop-stats" style={{borderLeft:`1px solid ${bestAlgo.color}33`,paddingLeft:"10px",display:"flex",gap:"8px"}}>
                 <StatBadge label="Path Len" value={bestAlgo.pathLen} color={bestAlgo.color} />
                 <StatBadge label="Visited"  value={bestAlgo.visited} color={bestAlgo.color} />
                 <StatBadge label="Time"     value={`${bestAlgo.time}ms`} color={bestAlgo.color} />
@@ -599,7 +644,7 @@ Rules:
           )}
 
           {stats && !bestAlgo && (
-            <div className="fade-up" style={{ display:"flex", gap:"12px", flexWrap:"wrap" }}>
+            <div className="fade-up stat-badges" style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
               <StatBadge label="Status"   value={stats.found ? "✓ Found" : "✗ No Path"} color={stats.found ? "#059669" : "#dc2626"} />
               <StatBadge label="Time"     value={`${stats.time} ms`}                     color={currentAlgo?.color ?? "#2563eb"} />
               <StatBadge label="Visited"  value={stats.visited.toLocaleString()}          color="#7c3aed" />
@@ -610,76 +655,97 @@ Rules:
       </div>
 
       {/* ── Body ── */}
-      <div style={{ display:"flex", flex:"1", overflow:"hidden" }}>
+      <div style={{ display:"flex", flex:"1", overflow:"hidden", position:"relative" }}>
 
-        <Sidebar
-          algo={algo}             setAlgo={setAlgo}
-          mode={mode}             setMode={setMode}
-          threshold={threshold}   setThreshold={setThreshold}
-          speed={speed}           setSpeed={setSpeed}
-          speedLabel={speedLabel}
-          clearVisualization={clearVisualization}
-        />
+        {/* Mobile backdrop */}
+        <div className={`sidebar-backdrop${sidebarOpen ? " open" : ""}`} onClick={() => setSidebarOpen(false)} />
+
+        {/* Sidebar — desktop: inline, mobile: drawer */}
+        <div className="sidebar-desktop" style={{ display:"flex" }}>
+          <Sidebar
+            algo={algo}             setAlgo={setAlgo}
+            mode={mode}             setMode={setMode}
+            threshold={threshold}   setThreshold={setThreshold}
+            speed={speed}           setSpeed={setSpeed}
+            speedLabel={speedLabel}
+            clearVisualization={clearVisualization}
+          />
+        </div>
+
+        {/* Mobile drawer */}
+        {sidebarOpen && (
+          <div className="sidebar-drawer sidebar-mobile">
+            <Sidebar
+              algo={algo}             setAlgo={setAlgo}
+              mode={mode}             setMode={setMode}
+              threshold={threshold}   setThreshold={setThreshold}
+              speed={speed}           setSpeed={setSpeed}
+              speedLabel={speedLabel}
+              clearVisualization={() => { clearVisualization(); setSidebarOpen(false); }}
+              onClose={() => setSidebarOpen(false)}
+            />
+          </div>
+        )}
 
         {/* Main area */}
         <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
           {/* Toolbar */}
-          <div style={{ background:"#fff", borderBottom:"1px solid #e8ecf5", padding:"12px 20px", display:"flex", gap:"8px", flexWrap:"wrap", alignItems:"center" }}>
+          <div style={{ background:"#fff", borderBottom:"1px solid #e8ecf5", padding:"8px 12px", display:"flex", gap:"6px", flexWrap:"wrap", alignItems:"center" }}>
 
-            <button className="btn-act" onClick={visualize} disabled={isRunning}
-              style={{ padding:"10px 22px", background:isRunning?"#e2e8f0":"linear-gradient(135deg,#2563eb,#3b82f6)", color:isRunning?"#94a3b8":"#fff", border:"none", borderRadius:"8px", cursor:isRunning?"not-allowed":"pointer", fontFamily:"inherit", fontSize:"13px", fontWeight:"600" }}>
+            <button className="btn-act toolbar-btn" onClick={visualize} disabled={isRunning}
+              style={{ padding:"8px 16px", background:isRunning?"#e2e8f0":"linear-gradient(135deg,#2563eb,#3b82f6)", color:isRunning?"#94a3b8":"#fff", border:"none", borderRadius:"8px", cursor:isRunning?"not-allowed":"pointer", fontFamily:"inherit", fontSize:"12px", fontWeight:"600" }}>
               {isRunning && !autoRunningAlgo ? <span className="pulsing">Running…</span> : "▶ Visualize"}
             </button>
 
-            <button className="btn-act" onClick={() => runAllAndShowBest(grid, startNode, endNode)} disabled={isRunning}
-              style={{ padding:"10px 20px", background:isRunning?"#e2e8f0":"linear-gradient(135deg,#0f766e,#059669)", color:isRunning?"#94a3b8":"#fff", border:"none", borderRadius:"8px", cursor:isRunning?"not-allowed":"pointer", fontFamily:"inherit", fontSize:"13px", fontWeight:"600" }}>
+            <button className="btn-act toolbar-btn" onClick={() => runAllAndShowBest(grid, startNode, endNode)} disabled={isRunning}
+              style={{ padding:"8px 14px", background:isRunning?"#e2e8f0":"linear-gradient(135deg,#0f766e,#059669)", color:isRunning?"#94a3b8":"#fff", border:"none", borderRadius:"8px", cursor:isRunning?"not-allowed":"pointer", fontFamily:"inherit", fontSize:"12px", fontWeight:"600" }}>
               {autoRunningAlgo ? <span className="pulsing">Running All…</span> : "⚡ Run All & Compare"}
             </button>
 
-            <button className="btn-act" onClick={runBenchmark} disabled={isRunning || isBenchmarking}
-              style={{ padding:"10px 20px", background:(isRunning||isBenchmarking)?"#e2e8f0":"#7c3aed", color:(isRunning||isBenchmarking)?"#94a3b8":"#fff", border:"none", borderRadius:"8px", cursor:(isRunning||isBenchmarking)?"not-allowed":"pointer", fontFamily:"inherit", fontSize:"13px", fontWeight:"600" }}>
-              {isBenchmarking ? <span className="pulsing">Benchmarking…</span> : "⏱ Benchmark All"}
+            <button className="btn-act toolbar-btn" onClick={runBenchmark} disabled={isRunning || isBenchmarking}
+              style={{ padding:"8px 14px", background:(isRunning||isBenchmarking)?"#e2e8f0":"#7c3aed", color:(isRunning||isBenchmarking)?"#94a3b8":"#fff", border:"none", borderRadius:"8px", cursor:(isRunning||isBenchmarking)?"not-allowed":"pointer", fontFamily:"inherit", fontSize:"12px", fontWeight:"600" }}>
+              {isBenchmarking ? <span className="pulsing">Benchmarking…</span> : "⏱ Benchmark"}
             </button>
 
-            <button className="btn-act" onClick={handleGenerateMaze} disabled={isRunning}
-              style={{ padding:"10px 16px", background:isRunning?"#f1f5f9":"linear-gradient(135deg,#0f766e,#059669)", color:isRunning?"#94a3b8":"#fff", border:"none", borderRadius:"8px", cursor:isRunning?"not-allowed":"pointer", fontFamily:"inherit", fontSize:"13px", fontWeight:"600" }}>
-              🌀 Random Maze
+            <button className="btn-act toolbar-btn" onClick={handleGenerateMaze} disabled={isRunning}
+              style={{ padding:"8px 12px", background:isRunning?"#f1f5f9":"linear-gradient(135deg,#0f766e,#059669)", color:isRunning?"#94a3b8":"#fff", border:"none", borderRadius:"8px", cursor:isRunning?"not-allowed":"pointer", fontFamily:"inherit", fontSize:"12px", fontWeight:"600" }}>
+              🌀 Maze
             </button>
 
-            <button className="btn-act" onClick={clearVisualization}
-              style={{ padding:"10px 16px", background:"transparent", border:"1.5px solid #e2e8f0", borderRadius:"8px", color:"#475569", fontFamily:"inherit", fontSize:"13px", cursor:"pointer" }}>
+            <button className="btn-act toolbar-btn" onClick={clearVisualization}
+              style={{ padding:"8px 12px", background:"transparent", border:"1.5px solid #e2e8f0", borderRadius:"8px", color:"#475569", fontFamily:"inherit", fontSize:"12px", cursor:"pointer" }}>
               Clear Path
             </button>
 
-            <button className="btn-act" onClick={clearAll}
-              style={{ padding:"10px 16px", background:"transparent", border:"1.5px solid #e2e8f0", borderRadius:"8px", color:"#475569", fontFamily:"inherit", fontSize:"13px", cursor:"pointer" }}>
+            <button className="btn-act toolbar-btn" onClick={clearAll}
+              style={{ padding:"8px 12px", background:"transparent", border:"1.5px solid #e2e8f0", borderRadius:"8px", color:"#475569", fontFamily:"inherit", fontSize:"12px", cursor:"pointer" }}>
               Clear All
             </button>
 
-            <button className="btn-act" onClick={() => fileInputRef.current.click()}
-              style={{ padding:"10px 16px", background:"transparent", border:"1.5px solid #e2e8f0", borderRadius:"8px", color:"#475569", fontFamily:"inherit", fontSize:"13px", cursor:"pointer" }}>
-              📤 Upload Floor Plan
+            <button className="btn-act toolbar-btn" onClick={() => fileInputRef.current.click()}
+              style={{ padding:"8px 12px", background:"transparent", border:"1.5px solid #e2e8f0", borderRadius:"8px", color:"#475569", fontFamily:"inherit", fontSize:"12px", cursor:"pointer" }}>
+              📤 Floor Plan
             </button>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{display:"none"}} />
 
             {/* 🚗 Generate Car Commands */}
             <button
-              className="btn-act"
+              className="btn-act toolbar-btn"
               onClick={generateCarCommands}
               disabled={isRunning || isGenerating || pathArray.length === 0}
               style={{
-                padding     : "10px 16px",
+                padding     : "8px 12px",
                 background  : (isRunning || isGenerating || pathArray.length === 0) ? "#e2e8f0" : "linear-gradient(135deg,#15803d,#16a34a)",
                 color       : (isRunning || isGenerating || pathArray.length === 0) ? "#94a3b8" : "#fff",
                 border      : "none",
                 borderRadius: "8px",
                 cursor      : (isRunning || isGenerating || pathArray.length === 0) ? "not-allowed" : "pointer",
                 fontFamily  : "inherit",
-                fontSize    : "13px",
+                fontSize    : "12px",
                 fontWeight  : "600",
               }}>
-              {isGenerating ? <span className="pulsing">Generating…</span> : "🚗 Generate Car Commands"}
+              {isGenerating ? <span className="pulsing">Generating…</span> : "🚗 Car Commands"}
             </button>
           </div>
 
@@ -843,15 +909,16 @@ Rules:
           )}
 
           {/* Grid */}
-          <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"16px", background:"#f8f9fc", overflow:"auto" }}>
+          <div style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", padding:"10px", background:"#f8f9fc", overflow:"auto", touchAction:"none" }}>
             <div
               onMouseLeave={() => setIsDrawing(false)}
+              onTouchEnd={() => setIsDrawing(false)}
               style={{
                 display:"grid",
                 gridTemplateColumns:`repeat(${COLS}, 1fr)`,
                 gap:"1px", background:"#d1d5db",
                 border:"3px solid #d1d5db", borderRadius:"10px",
-                padding:"3px", userSelect:"none",
+                padding:"3px", userSelect:"none", touchAction:"none",
               }}>
               {grid.map((row, r) => row.map((_, c) => {
                 const ct = cellTypeAt(r, c);
@@ -867,14 +934,23 @@ Rules:
                     onMouseDown={() => { setIsDrawing(true); handleCellInteraction(r, c); }}
                     onMouseEnter={() => { if (isDrawing && mode==="wall") handleCellInteraction(r, c); }}
                     onMouseUp={() => setIsDrawing(false)}
-                    style={{ width:"100%", aspectRatio:"1", background:bg, minWidth:"5px", minHeight:"5px" }}
+                    onTouchStart={(e) => { e.preventDefault(); setIsDrawing(true); handleCellInteraction(r, c); }}
+                    onTouchMove={(e) => {
+                      e.preventDefault();
+                      if (!isDrawing || mode !== "wall") return;
+                      const t = e.touches[0];
+                      const el = document.elementFromPoint(t.clientX, t.clientY);
+                      if (el && el.dataset.r !== undefined) handleCellInteraction(+el.dataset.r, +el.dataset.c);
+                    }}
+                    data-r={r} data-c={c}
+                    style={{ width:"100%", aspectRatio:"1", background:bg, minWidth:"4px", minHeight:"4px" }}
                   />
                 );
               }))}
             </div>
           </div>
 
-          <div style={{ padding:"8px 20px", background:"#fff", borderTop:"1px solid #e8ecf5", fontSize:"11px", color:"#94a3b8", display:"flex", gap:"16px", flexWrap:"wrap" }}>
+          <div className="footer-hint" style={{ padding:"6px 16px", background:"#fff", borderTop:"1px solid #e8ecf5", fontSize:"10px", color:"#94a3b8", display:"flex", gap:"12px", flexWrap:"wrap" }}>
             <span>Draw walls by clicking/dragging · Place source/target via Draw Mode · Click ⚡ Run All & Compare to find the best path</span>
             <span>After visualizing, click 🚗 Generate Car Commands · AI: <strong>{providerLabel}</strong></span>
           </div>
